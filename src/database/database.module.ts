@@ -1,11 +1,11 @@
+import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { TYPEORM_CONFIG } from './typeorm.config';
+import mikroormConfig from './mikro-orm.config';
 
 @Module({
-  imports: [TypeOrmModule.forRoot(TYPEORM_CONFIG)],
-  controllers: [],
-  providers: [],
-  exports: [],
+  imports: [
+    MikroOrmModule.forRoot(mikroormConfig),
+    // andre moduler her
+  ],
 })
 export class DatabaseModule {}

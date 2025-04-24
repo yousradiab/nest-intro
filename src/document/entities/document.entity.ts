@@ -1,34 +1,23 @@
-import {
-  Column,
-  PrimaryGeneratedColumn,
-  Entity,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryKey, Property } from '@mikro-orm/core';
+import { VectorType } from 'pgvector/mikro-orm';
+import { v4 } from 'uuid';
 
 export type Vector = number[];
 
 @Entity()
 export class Document {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryKey({ type: 'uuid' })
+  uuid = v4();
 
-  @Column('text')
+  @Property({ type: 'text' })
   content: string;
 
-  @Column('float', { array: true })
+  @Property({ type: VectorType })
   embedding: Vector;
-  @Column()
-  @CreateDateColumn({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP(6)',
-  })
-  createdAt: Date;
-  @Column()
-  @UpdateDateColumn({
-    type: 'timestamp',
-    default: () => 'CURRENT_TIMESTAMP(6)',
-    onUpdate: 'CURRENT_TIMESTAMP(6)',
-  })
-  updatedAt: Date;
+
+  @Property()
+  createdAt = new Date();
+
+  @Property({ onUpdate: () => new Date() })
+  updatedAt = new Date();
 }

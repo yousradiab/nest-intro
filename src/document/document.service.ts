@@ -1,36 +1,37 @@
 import { Injectable } from '@nestjs/common';
-import { InjectEntityManager } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
-import { Repository } from 'typeorm/repository/Repository';
-import { Document } from './entities/document.entity';
+import { Document, Vector } from './entities/document.entity';
+import { InjectRepository } from '@mikro-orm/nestjs';
+import { EntityRepository } from '@mikro-orm/postgresql';
 
 @Injectable()
 export class DocumentService {
-  private readonly documentRepository: Repository<Document>;
-
   constructor(
-    @InjectEntityManager()
-    private readonly manager: EntityManager,
-    private readonly dataSource: DataSource,
-  ) {
-    this.documentRepository = this.manager.getRepository(Document);
+    @InjectRepository(Document)
+    private readonly documentRepository: EntityRepository<Document>,
+  ) {}
+
+  async saveDocument(content: string, embedding: Vector) {
+    const doc = this.documentRepository.create({
+      content,
+      embedding,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await this.documentRepository.getEntityManager().persistAndFlush(document);
+
+    return doc;
   }
 
-  async saveDocument(content: string, embedding: number[]) {
-    const doc = this.documentRepository.create({ content, embedding });
-    return this.documentRepository.save(doc);
-  }
-
-  async searchSimilarDocuments(
-    embedding: number[],
-    limit = 5,
-  ): Promise<Document> {
-    return this.dataSource.query(
-      `SELECT *, embedding <=> $1 AS similarity
-       FROM document
-       ORDER BY similarity ASC
-       LIMIT $2`,
-      [embedding, limit],
-    );
-  }
+  // async searchSimilarDocuments(
+  //   embedding: number[],
+  //   limit = 5,
+  // ): Promise<Document> {
+  //   return this.dataSource.query(
+  //     `SELECT *, embedding <=> $1 AS similarity
+  //      FROM document
+  //      ORDER BY similarity ASC
+  //      LIMIT $2`,
+  //     [embedding, limit],
+  //   );
+  // }
 }
