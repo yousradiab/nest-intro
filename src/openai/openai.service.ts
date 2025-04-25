@@ -6,13 +6,12 @@ import { Vector } from 'src/document/entities/document.entity';
 export class OpenaiService {
   private openai: OpenAI;
   constructor() {
-    this.openai = new OpenAI();
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
-  async getEmbedding(): Promise<Vector> {
+  async generateEmbedding(text: string): Promise<Vector> {
     const response = await this.openai.embeddings.create({
       model: 'text-embedding-3-small',
-      input:
-        'Blue whales are the largest animals ever known to have lived on Earth. They can reach lengths of up to 100 feet and weigh as much as 200 tons. They are known for their immense size and distinctive blue-gray coloration.',
+      input: text,
       encoding_format: 'float',
     });
     console.log(response);
