@@ -7,10 +7,22 @@ import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { OpenaiService } from 'src/openai/openai.service';
 import * as pdfParse from 'pdf-parse';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { DocumentChunk } from './entities/document-chunk.entity';
 
 type PDFData = {
   text: string;
   numPages: number;
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string;
+  creator?: string;
+  producer?: string;
+  creationDate?: string; // (OBS: stavefejl i din entitet, se note nedenfor)
+  modDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 @Injectable()
@@ -18,6 +30,8 @@ export class DocumentService {
   constructor(
     @InjectRepository(Document)
     private readonly documentRepository: EntityRepository<Document>,
+    @InjectRepository(DocumentChunk)
+    private readonly chunkRepository: EntityRepository<DocumentChunk>,
     private readonly openAiService: OpenaiService,
   ) {}
 
@@ -27,7 +41,6 @@ export class DocumentService {
 
   async genereateEmbedding(text: string): Promise<Vector> {
     const response = await this.openAiService.generateEmbedding(text);
-    console.log('Embedding response', response);
     return response;
   }
 
@@ -36,63 +49,45 @@ export class DocumentService {
     const pdf: PDFData = {
       text: pdfData.text,
       numPages: pdfData.numpages,
+      title: pdfData.info.Title,
+      author: pdfData.info.Author,
+      subject: pdfData.info.Subject,
+      keywords: pdfData.info.Keywords,
+      creator: pdfData.info.Producer,
+      producer: pdfData.info.Creator,
+      creationDate: pdfData.info.CreationDate,
+      modDate: pdfData.info.ModDate,
     };
     console.log(pdf);
     return pdf;
-  }
-  private semanticChunking(text: string): string[] {
-    // Option 1: Using natural language boundaries
-    const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
-
-    // Merge short paragraphs and split long ones based on semantic coherence
-    const chunks: string[] = [];
-    let currentChunk = '';
-
-    for (const paragraph of paragraphs) {
-      // If adding this paragraph would make chunk too long, save current chunk and start new one
-      if (
-        currentChunk.length + paragraph.length > 1000 &&
-        currentChunk.length > 0
-      ) {
-        chunks.push(currentChunk);
-        currentChunk = paragraph;
-      } else {
-        currentChunk =
-          currentChunk.length > 0
-            ? `${currentChunk}\n\n${paragraph}`
-            : paragraph;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
-    }
-
-    return chunks;
   }
 
   async processPDF(file: Express.Multer.File): Promise<void> {
     const pdfData = await this.readPDF(file);
     const text = pdfData.text;
-    const chunks = this.semanticChunking(text);
+    const savedDocument = await this.saveDocument(pdfData);
+
+    const splitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      separators: ['\n\n', '\n', '. ', ' ', ''],
+    });
+    const chunks = await splitter.splitText(text);
+
     for (const chunk of chunks) {
       const embedding = await this.genereateEmbedding(chunk);
-      const document = new Document();
-      document.content = chunk;
-      document.embedding = embedding;
-      this.documentRepository.getEntityManager().persist(document);
+      const documentChunk = new DocumentChunk();
+      documentChunk.content = chunk;
+      documentChunk.embedding = embedding;
+      documentChunk.document = savedDocument;
+      this.chunkRepository.getEntityManager().persist(documentChunk);
     }
     await this.documentRepository.getEntityManager().flush();
   }
 
-  async saveDocument(content: string, embedding: Vector) {
-    const doc = this.documentRepository.create({
-      content,
-      embedding,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    await this.documentRepository.getEntityManager().persistAndFlush(document);
+  async saveDocument(pdf: PDFData): Promise<Document> {
+    const doc = this.documentRepository.create(pdf);
+    await this.documentRepository.getEntityManager().persistAndFlush(doc);
 
     return doc;
   }

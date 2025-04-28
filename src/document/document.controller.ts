@@ -26,7 +26,6 @@ export class DocumentController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
-    console.log('controller', file);
     await this.documentService.processPDF(file);
   }
 }
