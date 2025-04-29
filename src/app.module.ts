@@ -5,8 +5,8 @@ import { UsersModule } from './users/users.module';
 import { DatabaseModule } from './database/database.module';
 import { DocumentModule } from './document/document.module';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { OpenaiService } from './openai/openai.service';
-import { OpenaiModule } from './openai/openai.module';
+import { RagService } from './rag/rag.service';
+import { OpenaiModule } from './rag/rag.module';
 import MIKROORM_CONFIG from './database/mikro-orm.config';
 
 @Module({
@@ -18,6 +18,6 @@ import MIKROORM_CONFIG from './database/mikro-orm.config';
     OpenaiModule,
   ],
   controllers: [AppController],
-  providers: [AppService, OpenaiService],
+  providers: [AppService, RagService],
 })
 export class AppModule {}

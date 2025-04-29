@@ -4,11 +4,12 @@
 import { Injectable } from '@nestjs/common';
 import { Document, Vector } from './entities/document.entity';
 import { InjectRepository } from '@mikro-orm/nestjs';
-import { EntityRepository } from '@mikro-orm/postgresql';
-import { OpenaiService } from 'src/openai/openai.service';
+import { EntityManager, EntityRepository } from '@mikro-orm/postgresql';
+import { RagService } from 'src/rag/rag.service';
 import * as pdfParse from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { DocumentChunk } from './entities/document-chunk.entity';
+import { cosineDistance } from 'pgvector/mikro-orm';
 
 type PDFData = {
   text: string;
@@ -32,7 +33,8 @@ export class DocumentService {
     private readonly documentRepository: EntityRepository<Document>,
     @InjectRepository(DocumentChunk)
     private readonly chunkRepository: EntityRepository<DocumentChunk>,
-    private readonly openAiService: OpenaiService,
+    private readonly ragService: RagService,
+    private readonly em: EntityManager,
   ) {}
 
   async findAll() {
@@ -40,7 +42,7 @@ export class DocumentService {
   }
 
   async genereateEmbedding(text: string): Promise<Vector> {
-    const response = await this.openAiService.generateEmbedding(text);
+    const response = await this.ragService.generateEmbedding(text);
     return response;
   }
 
@@ -64,7 +66,12 @@ export class DocumentService {
 
   async processPDF(file: Express.Multer.File): Promise<void> {
     const pdfData = await this.readPDF(file);
-    const text = pdfData.text;
+    const cleanedText = pdfData.text
+      .replace(/\t/g, ' ') // erstatter tab med mellemrum
+      .replace(/[ ]{2,}/g, ' ') // fjerner dobbelte mellemrum
+      .replace(/[ ]*\n[ ]*/g, '\n') // fjerner mellemrum omkring linjeskift
+      .trim();
+
     const savedDocument = await this.saveDocument(pdfData);
 
     const splitter = new RecursiveCharacterTextSplitter({
@@ -72,7 +79,8 @@ export class DocumentService {
       chunkOverlap: 200,
       separators: ['\n\n', '\n', '. ', ' ', ''],
     });
-    const chunks = await splitter.splitText(text);
+
+    const chunks = await splitter.splitText(cleanedText);
 
     for (const chunk of chunks) {
       const embedding = await this.genereateEmbedding(chunk);
@@ -82,6 +90,7 @@ export class DocumentService {
       documentChunk.document = savedDocument;
       this.chunkRepository.getEntityManager().persist(documentChunk);
     }
+
     await this.documentRepository.getEntityManager().flush();
   }
 
@@ -92,16 +101,33 @@ export class DocumentService {
     return doc;
   }
 
-  // async searchSimilarDocuments(
-  //   embedding: number[],
-  //   limit = 5,
-  // ): Promise<Document> {
-  //   return this.dataSource.query(
-  //     `SELECT *, embedding <=> $1 AS similarity
-  //      FROM document
-  //      ORDER BY similarity ASC
-  //      LIMIT $2`,
-  //     [embedding, limit],
-  //   );
-  // }
+  async findSimilar(
+    qureyEmbedding: number[],
+    limit = 5,
+  ): Promise<DocumentChunk[]> {
+    const documentChunk = await this.em
+      .createQueryBuilder(DocumentChunk)
+      .orderBy({
+        [cosineDistance('embedding', qureyEmbedding, this.em)]: 'ASC',
+      })
+      .limit(limit)
+      .getResult();
+    return documentChunk;
+  }
+
+  async retrieveSimilarDocumentChunks(
+    query: string,
+    limit = 20,
+  ): Promise<DocumentChunk[]> {
+    const queryEmbedding = await this.genereateEmbedding(query);
+    return this.findSimilar(queryEmbedding, limit);
+  }
+
+  async rerankWithCohere(
+    query: string,
+    documentChunks: DocumentChunk[],
+    topN = 5,
+  ) {
+    return await this.ragService.rerankWithCohere(query, documentChunks, topN);
+  }
 }

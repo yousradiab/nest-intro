@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
@@ -21,6 +22,13 @@ export class DocumentController {
     const text = 'What is the capital of France';
     const embedding = await this.documentService.genereateEmbedding(text);
     return embedding;
+  }
+
+  @Get('similarity-test')
+  async testSimilarity(@Body() body: { prompt: string }) {
+    const similarDocs =
+      await this.documentService.retrieveSimilarDocumentChunks(body.prompt);
+    return this.documentService.rerankWithCohere(body.prompt, similarDocs);
   }
 
   @Post('upload')

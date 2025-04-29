@@ -201,6 +201,7 @@
           "primary": false,
           "nullable": false,
           "length": 6,
+          "default": "now()",
           "mappedType": "datetime"
         },
         "updated_at": {
@@ -211,6 +212,7 @@
           "primary": false,
           "nullable": false,
           "length": 6,
+          "default": "now()",
           "mappedType": "datetime"
         }
       },

@@ -16,9 +16,10 @@ export class DocumentChunk {
 
   @ManyToOne(() => Document)
   document: Document;
-  @Property()
-  createdAt = new Date();
 
-  @Property({ onUpdate: () => new Date() })
-  updatedAt = new Date();
+  @Property({ defaultRaw: 'now()' })
+  createdAt?: Date;
+
+  @Property({ onUpdate: () => 'now()', defaultRaw: 'now()' })
+  updatedAt?: Date;
 }
