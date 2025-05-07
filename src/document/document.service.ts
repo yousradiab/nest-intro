@@ -5,7 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { Document, Vector } from './entities/document.entity';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityManager, EntityRepository } from '@mikro-orm/postgresql';
-import { RagService } from 'src/rag/rag.service';
+import { CohereRerankResponse, RagService } from 'src/rag/rag.service';
 import * as pdfParse from 'pdf-parse';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { DocumentChunk } from './entities/document-chunk.entity';
@@ -44,6 +44,13 @@ export class DocumentService {
   async genereateEmbedding(text: string): Promise<Vector> {
     const response = await this.ragService.generateEmbedding(text);
     return response;
+  }
+
+  async generateRespons(
+    prompt: string,
+    relevantChunks: CohereRerankResponse[],
+  ): Promise<string> {
+    return await this.ragService.generateResponse(prompt, relevantChunks);
   }
 
   async readPDF(file: Express.Multer.File): Promise<PDFData> {

@@ -28,7 +28,11 @@ export class DocumentController {
   async testSimilarity(@Body() body: { prompt: string }) {
     const similarDocs =
       await this.documentService.retrieveSimilarDocumentChunks(body.prompt);
-    return this.documentService.rerankWithCohere(body.prompt, similarDocs);
+    const rerankedResults = await this.documentService.rerankWithCohere(
+      body.prompt,
+      similarDocs,
+    );
+    return this.documentService.generateRespons(body.prompt, rerankedResults);
   }
 
   @Post('upload')
